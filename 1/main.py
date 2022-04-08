@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import sys
-from turtle import right
 
 def main():
     if len(sys.argv) > 1:
@@ -53,42 +52,41 @@ def main():
         goal = nestedStringtoInt(goal)
 
         if input[0][2] == 1:
-            head = River(input[0],input[1],None,)
-            # head = expandTree(head,goal[1])
-            head = bfsdfs(head,goal[1],"dfs")
+            left = input[0]
+            right = input[1]
+            final = goal[1]
         elif input[1][2] == 1:
-            head = River(input[1],input[0],None)
-            # head = expandTree(head,goal[0])
-            head = bfsdfs(head,goal[0],"bfs")
+            left = input[1]
+            right = input[0]
+            final = goal[0]
 
-        print_tree(head)
-
-        out = open(outputfile, "w")  # write mode
-        out.write("Testing.\n")
+        head = River(left,right,None,0)
 
         if mode == "bfs":
-            # Do breadth first search
-            # bfsdfs()
-            pass
+            ret = triple(head,final,"bfs", -1)
         elif mode == "dfs":
-            # Do depth-first search
-            # bfsdfs
-            pass
+            ret = triple(head,final,"dfs", -1)
         elif mode == "iddfs":
-            # Do iterative deepening depth-first search
-            pass
+            ret = triple(head,final,"iddfs", 30)
         elif mode == "astar":
-            # Do a-star search
-            pass
+            ret = astar(head,final)
         else:
             raise Exception("Invalid mode provided. Please provide a valid mode member of [bfs,dfs,iddfs,astar]")
 
-        u.close() # Input file
-        v.close() # Output file
+        # print_tree(ret[0])
+
+        out = open(outputfile, "w")  # write mode
+        out.write(ret[1])
+
+        # head = expandTree(head,goal[1])
+
+        u.close() # closing input file
+        v.close() # closing goal file
+        out.close() # closing output file
     else:
         print("Please provide an input file in the format of python main.py inputfile.txt goalfile.txt searchmode outputfile.txt")
 
-def bfsdfs(head,goal,kind):
+def triple(head,goal,kind, limit):
     """Implements bfs/dfs with a first in first out queue"""
     fifo = [head] # initialize the frontier using the initial state of the problem
     explored = [] # initialize the explored set to be empty
@@ -98,7 +96,7 @@ def bfsdfs(head,goal,kind):
     while len(fifo) > 0: # if frontier is empty and we, terminate the loop and return failure
         if kind == "bfs":
             newleaf = fifo.pop(0)
-        elif kind == "dfs":
+        elif kind == "dfs" or kind == 'iddfs':
             newleaf = fifo.pop()
         else:
             print("Please provide a correct type, 'dfs' or 'bfs'")
@@ -107,15 +105,72 @@ def bfsdfs(head,goal,kind):
         if newleaf.rightside == goal: # if the node contains a goal state then return the corresponding solution
             goalReached = True
             print("Goal reached, " + str(newleaf) + "\n")
+            print("GOAL DEPTH: " + str(newleaf.depth))
             while newleaf != None:
                 solution = str(newleaf) + "\n" + solution
                 newleaf = newleaf.parent
             break
         
-        newleaf.expandChildren(explored) # expand the chosen node, adding the resulting nodes to the frontier
+        if kind == 'iddfs' and newleaf.depth > limit: # If we've gone past the limit, then stop expanding nodes to the frontier
+            pass
+        else:
+            newleaf.expandChildren(explored) # expand the chosen node, adding the resulting nodes to the frontier
+
         fifo.extend(newleaf.children)
-        print([ str(i) for i in fifo])
         explored.extend(newleaf.children) # add the nodes to the explored set
+        
+    if goalReached:
+        # print("Found solution: \n" + solution)
+        pass
+    else:
+        print("Failed to find a solution.")
+
+    print(str(len(explored)) + " nodes expanded")
+
+    return (head,solution)
+
+def iddfs(head,goal):
+    pass
+      
+# Driver's code
+
+def astar(head,goal):
+    """Implements astar search with a first priority queue"""
+
+    # Implement as a priority queue
+    priority = [(0,head)] # initialize the frontier using the initial state of the problem
+    explored = [] # initialize the explored set to be empty
+    solution = ""
+    goalReached = False
+
+    while len(priority) > 0: # if frontier is empty and we, terminate the loop and return failure
+        priority.sort(key=lambda x:x[0],reverse=True)
+        newleaf = priority.pop()
+        leaf = newleaf[1]
+
+        # choose leaf node and remove it from the frontier
+        if leaf.rightside == goal: # if the node contains a goal state then return the corresponding solution
+            goalReached = True
+            print("Goal reached, " + str(leaf) + "\n")
+            print("GOAL DEPTH: " + str(leaf.depth))
+            while leaf != None:
+                solution = str(leaf) + "\n" + solution
+                leaf = leaf.parent
+            break
+        
+        leaf.expandChildren(explored) # expand the chosen node, adding the resulting nodes to the frontier
+
+        for i in leaf.children:
+            gofn = i.depth
+            hofn = ((goal[0] - i.rightside[0]) + (goal[1] - i.rightside[1]) + i.rightside[2]) * 1.7 
+
+            print(hofn)
+
+            score = gofn + hofn
+
+            priority.append((score,i))
+
+        explored.extend(leaf.children) # add the nodes to the explored set
         
     if goalReached:
         print("Found solution: \n" + solution)
@@ -124,7 +179,7 @@ def bfsdfs(head,goal,kind):
 
     print(str(len(explored)) + " nodes expanded")
 
-    return head
+    return (head,solution)
 
 def nestedStringtoInt(arr):
     """Turns a nested array of strings into a nested array of integers"""
@@ -165,14 +220,18 @@ def expandTree(head,goal):
 class River:
     '''Represents a state of the chicken and wolves problem. Also functions as a Node in a tree data structure'''
 
-    def __init__(self,leftside,rightside,parent):
+    def __init__(self,leftside,rightside,parent,depth):
         """Takes leftside and rightside states, 
         containing a list of values representing the state of the game.
         the list is ordered by [chicken, wolves, boat]. For example,
         [3,3,1] would mean that 3 chickens and 3 wolves were on that side of the river
         and the boat as well. [2,3,0] means 2 chickens, 3 wolves, and no boat is on that side of the river"""
+
         self.leftside = leftside
         self.rightside = rightside
+
+        # Number of steps away from the head node
+        self.depth = depth
 
         self.parent = parent
         self.children = []
@@ -246,7 +305,7 @@ class River:
             newLeft[2] = 1
 
         if self.checkValid(newLeft,newRight) == True:
-            return River(newLeft, newRight, self)
+            return River(newLeft, newRight, self, self.depth + 1)
         else:
             return False
 
