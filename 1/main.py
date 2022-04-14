@@ -67,7 +67,7 @@ def main():
         elif mode == "dfs":
             ret = triple(head,final,"dfs", -1)
         elif mode == "iddfs":
-            ret = triple(head,final,"iddfs", 30)
+            ret = triple(head,final,"iddfs", (left[0] + left[1])*2)
         elif mode == "astar":
             ret = astar(head,final)
         else:
@@ -86,7 +86,7 @@ def main():
     else:
         print("Please provide an input file in the format of python main.py inputfile.txt goalfile.txt searchmode outputfile.txt")
 
-def triple(head,goal,kind, limit):
+def triple(head,goal,kind,limit):
     """Implements bfs/dfs with a first in first out queue"""
     fifo = [head] # initialize the frontier using the initial state of the problem
     explored = [] # initialize the explored set to be empty
@@ -145,7 +145,7 @@ def astar(head,goal):
 
     while len(priority) > 0: # if frontier is empty and we, terminate the loop and return failure
         priority.sort(key=lambda x:x[0],reverse=True)
-        newleaf = priority.pop()
+        newleaf = priority.pop(0)
         leaf = newleaf[1]
 
         # choose leaf node and remove it from the frontier
@@ -162,9 +162,9 @@ def astar(head,goal):
 
         for i in leaf.children:
             gofn = i.depth
-            hofn = ((goal[0] - i.rightside[0]) + (goal[1] - i.rightside[1]) + i.rightside[2]) * 1.7 
-
-            print(hofn)
+            # hofn = ((goal[0] - i.rightside[0]) + (goal[1] - i.rightside[1]) + i.rightside[2]) * 1.7 # old heuristic
+            hofn = ((goal[0] + goal[1]) * 2) - i.depth
+            hofn = hofn - (hofn * .02)
 
             score = gofn + hofn
 
@@ -173,7 +173,8 @@ def astar(head,goal):
         explored.extend(leaf.children) # add the nodes to the explored set
         
     if goalReached:
-        print("Found solution: \n" + solution)
+        # print("Found solution: \n" + solution)
+        pass
     else:
         print("Failed to find a solution.")
 
