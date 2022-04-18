@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import sys
+import time
 
 def main():
     if len(sys.argv) > 1:
@@ -65,13 +66,29 @@ def main():
         if mode == "bfs":
             ret = triple(head,final,"bfs", -1)
         elif mode == "dfs":
-            ret = triple(head,final,"dfs", -1)
+            ret = triple(head,final,"dfs", (left[0] + left[1])*2)
         elif mode == "iddfs":
-            ret = triple(head,final,"iddfs", (left[0] + left[1])*2)
+            start = time.time()
+            limit = 1
+            finished = False
+            totalExpanded = 0
+            while finished != True:
+                limit += 1
+                ret = triple(head,final,"iddfs", limit)
+                if type(ret) is tuple:
+                    finished = True
+                else:
+                    totalExpanded += ret
+            end = time.time()
+            print("IDDFS took " + str(end-start) + " seconds")
+            print("[IDDFS] Total nodes expanded " + str(totalExpanded))
         elif mode == "astar":
             ret = astar(head,final)
         else:
             raise Exception("Invalid mode provided. Please provide a valid mode member of [bfs,dfs,iddfs,astar]")
+
+        if type(ret) is not tuple:
+            print("Failed to find a solution.")
 
         # print_tree(ret[0])
 
@@ -86,18 +103,25 @@ def main():
     else:
         print("Please provide an input file in the format of python main.py inputfile.txt goalfile.txt searchmode outputfile.txt")
 
-def triple(head,goal,kind,limit):
+def triple(head,goal,kind,max):
     """Implements bfs/dfs with a first in first out queue"""
+    cutoff = 1 # Maximum limit for which DFS will not go further
     fifo = [head] # initialize the frontier using the initial state of the problem
-    explored = [] # initialize the explored set to be empty
+    explored = [head] # initialize the explored set to be empty
+    expanded = 0 # Number of nodes which have already been explored
     solution = ""
-    goalReached = False
+
+    if kind == "dfs" or "iddfs": # Set the constant depth limit for depth first search
+        cutoff = max
 
     while len(fifo) > 0: # if frontier is empty and we, terminate the loop and return failure
+
         if kind == "bfs":
             newleaf = fifo.pop(0)
-        elif kind == "dfs" or kind == 'iddfs':
+        elif kind == "dfs":
             newleaf = fifo.pop()
+        elif kind == "iddfs":
+            newleaf = fifo.pop(0)
         else:
             print("Please provide a correct type, 'dfs' or 'bfs'")
         
@@ -109,25 +133,19 @@ def triple(head,goal,kind,limit):
             while newleaf != None:
                 solution = str(newleaf) + "\n" + solution
                 newleaf = newleaf.parent
+            # print("Found solution: \n" + solution)
+            print(str(expanded) + " nodes expanded")
+            return (head,solution)
             break
-        
-        if kind == 'iddfs' and newleaf.depth > limit: # If we've gone past the limit, then stop expanding nodes to the frontier
-            pass
         else:
-            newleaf.expandChildren(explored) # expand the chosen node, adding the resulting nodes to the frontier
-
-        fifo.extend(newleaf.children)
-        explored.extend(newleaf.children) # add the nodes to the explored set
-        
-    if goalReached:
-        # print("Found solution: \n" + solution)
-        pass
-    else:
-        print("Failed to find a solution.")
-
-    print(str(len(explored)) + " nodes expanded")
-
-    return (head,solution)
+            if (kind == 'dfs' or kind == "iddfs") and newleaf.depth > cutoff: # If we've gone past the cutoff, then stop expanding nodes entirely
+                pass
+            else:
+                newleaf.expandChildren(explored) # expand the chosen node, adding the resulting nodes to the frontier
+                fifo.extend(newleaf.children)
+                explored.extend(newleaf.children) # add the nodes to the explored set
+                expanded += 1
+    return expanded
 
 def iddfs(head,goal):
     pass
@@ -140,6 +158,7 @@ def astar(head,goal):
     # Implement as a priority queue
     priority = [(0,head)] # initialize the frontier using the initial state of the problem
     explored = [] # initialize the explored set to be empty
+    expanded = 0 # Number of nodes expanded in total
     solution = ""
     goalReached = False
 
@@ -157,20 +176,21 @@ def astar(head,goal):
                 solution = str(leaf) + "\n" + solution
                 leaf = leaf.parent
             break
-        
-        leaf.expandChildren(explored) # expand the chosen node, adding the resulting nodes to the frontier
+        else:
+            expanded += 1
+            leaf.expandChildren(explored) # expand the chosen node, adding the resulting nodes to the frontier
 
-        for i in leaf.children:
-            gofn = i.depth
-            # hofn = ((goal[0] - i.rightside[0]) + (goal[1] - i.rightside[1]) + i.rightside[2]) * 1.7 # old heuristic
-            hofn = ((goal[0] + goal[1]) * 2) - i.depth
-            hofn = hofn - (hofn * .02)
+            for i in leaf.children:
+                gofn = i.depth
+                # hofn = ((goal[0] - i.rightside[0]) + (goal[1] - i.rightside[1]) + i.rightside[2]) * 1.7 # old heuristic
+                hofn = ((goal[0] + goal[1]) * 2) - i.depth
+                hofn = hofn - (hofn * .02)
 
-            score = gofn + hofn
+                score = gofn + hofn
 
-            priority.append((score,i))
+                priority.append((score,i))
 
-        explored.extend(leaf.children) # add the nodes to the explored set
+            explored.extend(leaf.children) # add the nodes to the explored set
         
     if goalReached:
         # print("Found solution: \n" + solution)
@@ -178,7 +198,7 @@ def astar(head,goal):
     else:
         print("Failed to find a solution.")
 
-    print(str(len(explored)) + " nodes expanded")
+    print(str(expanded) + " nodes expanded")
 
     return (head,solution)
 
@@ -333,6 +353,8 @@ class River:
             for j in duplicates:
                 if i == j:
                     duplicate = True
+                    if i.depth < j.depth:
+                        duplicate = False
             if (i != False) and (duplicate != True):
                 filtered.append(i)
 
