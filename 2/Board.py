@@ -45,7 +45,11 @@ class Board:
         return tmp
     #deepcopy is slow, consider replacing with list slice if performance demands
 
-
+    def __eq__(self, o: object) -> bool:
+        if o.grid == self.grid:
+            return True
+        else:
+            return False
 
     #empties grid. No other references will remain.
     def delete_grid(self):

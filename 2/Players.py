@@ -6,7 +6,10 @@
 '''
 
 from os import terminal_size
-
+import threading
+import itertools
+import time
+import sys
 
 class Player:
     def __init__(self, symbol):
@@ -48,24 +51,57 @@ class MinimaxPlayer(Player):
             self.symbol = 'O'
             self.oppSym = 'X'
 
+    """Not my code, taken from https://stackoverflow.com/questions/22029562/python-how-to-make-simple-animated-loading-while-process-is-running
+    Does not implement any critical functionalities to the assignment, just a loading bar for convenience. 
+    """
+    def animate(self):
+        for c in itertools.cycle(['|', '/', '-', '\\']):
+            if self.waiting == False:
+                break
+            sys.stdout.write('\rloading.. ' + c)
+            sys.stdout.flush()
+            time.sleep(0.1)
+        sys.stdout.flush()
+        print('\rDone!       ')
+    """End of not my code"""
+
+
     # From here down, all the code in this file was written by me (Alaric Hartsock)
 
     """
     Determines the move from the 
     """
     def get_move(self, board):
+
+        # self.waiting = True
+        # t = threading.Thread(target=self.animate)
+        # t.start()
+
         if self.head == None:
             self.head = Node(board, self.symbol, self.oppSym)
             self.expandTree(self.head)
             self.miniMax(self.head)
-            print_tree(self.head)
         else:
             pass
             
+        if self.head.board == board: # If our head is pointed at the current board state, then pass.
+            pass
+        else: # Else update the head to be pointed at the current board state
+            for i in self.head.children:
+                if i.board == board:
+                    self.head = i
+            if self.head.parent.board == board:
+                self.head = self.head.parent
+            elif self.head.board != board:
+                print("DEBUG: Regenerating tree unnecessarily. To improve performance, debug")
+                self.head = Node(board, self.symbol, self.oppSym)
+                self.expandTree(self.head)
+                self.miniMax(self.head)
 
         # while self.head != None:
         #     print(str(self.head))
-        #     print(str(self.head.minimax_value))
+        #     print("minmax: " + str(self.head.minimax_value))
+        #     print("utility: " + str(self.head.terminal_value))
         #     try:
         #         self.head = self.head.children.pop()
         #     except IndexError as e:
@@ -73,12 +109,49 @@ class MinimaxPlayer(Player):
         #         self.head = None
 
         # Determine next best move for robot
-        # col = 2
-        # row = 0
 
-        col = int(input("Enter col:"))
-        row = int(input("Enter row:"))
+        bestchild = self.findBestChild(self.head.children[0],self.head.children)
+
+        col = bestchild.move[0]
+        row = bestchild.move[1]
+
+        while col == None and row == None:
+            bestchild = self.findBestChild(bestchild.children[0],bestchild.children)
+
+            col = bestchild.move[0]
+            row = bestchild.move[1]
+
+        self.head = bestchild
+
+        # self.waiting = False
+
+        # t.join()
         return  (col, row)
+
+    def findBestChild(self,bestchild,children):
+
+
+        for child in children:
+            if (child.terminal_node == True and bestchild.terminal_node == True):
+                if (child.terminal_value >= bestchild.terminal_value):
+                    bestchild = child
+                else:
+                    pass
+            elif (child.terminal_node == True and bestchild.terminal_node == False):
+                if child.terminal_value >= bestchild.minimax_value:
+                    bestchild = child
+                else:
+                    pass
+            elif (child.terminal_node == False and bestchild.terminal_node == True):
+                if child.minimax_value >= bestchild.terminal_value:
+                    bestchild = child
+                else: 
+                    pass
+            else: # Child and bestchild are both nonterminal nodes
+                if child.minimax_value >= bestchild.minimax_value:
+                    bestchild = child
+        
+        return bestchild
 
     """
     Implements the minimax functionality and pseudocode
@@ -139,6 +212,8 @@ class Node():
         self.terminal_value = self.utility_func(self)
         self.minimax_value = None
 
+        self.move = None # Move required to get to this state from the parent state
+
     def __iter__(self):
         """Overrides iterable function for pretty printing purposes"""
         return iter(self.children)
@@ -172,16 +247,11 @@ class Node():
         return str(self.board)
 
     """
-    
-    """
-    def __len__(self):
-        return len(self.children)
-
-    """
     Sets the child, appending it to the children class and automatically setting the parent as equal to the current node
     """
-    def set_child(self,board):
-        child = Node(board, self.oppsym, self.symbol)
+    def set_child(self,move):
+        child = Node(move[0], self.oppsym, self.symbol)
+        child.move = move[1]
         child.parent = self
 
         self.children.append(child)
@@ -193,23 +263,27 @@ class Node():
     Automatically generates children for current node (not entire tree). Uses the set_child method. 
     """
     def birth_babies(self):
-        for i in self.get_succ(self.board,self.symbol):
+        for i in self.get_succ(self.board,self.symbol,self.oppsym):
             self.set_child(i)
 
     """
     Finds all legal board states after this current board state and returns them in a list.
     """
-    def get_succ(self,board,symbol):
+    def get_succ(self,board,symbol,oppsym):
         moves = []
 
         if board.has_legal_moves_remaining(symbol):
-
             for i in range (0, board.cols):
                 for j in range (0, board.rows):
                     if board.is_cell_empty(i, j) and board.is_legal_move(i, j, symbol):
                         newBoard = board.cloneOBoard()
                         newBoard.play_move(i,j,symbol)
-                        moves.append(newBoard)
+                        moves.append([newBoard,(i,j)])
+        else: # In this case, current player has no legal moves but the opponent does. So the opponent can go twice or rarely, more in some cases
+            if board.has_legal_moves_remaining(oppsym):
+                newBoard = board.cloneOBoard()
+                moves.append([newBoard,(None,None)])
+
         return moves
 
 """NOT MY CODE."""
